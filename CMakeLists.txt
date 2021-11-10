@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.20)
+project(cs6233_project C CXX)
+
+add_library(benchmark OBJECT src/benchmark.cc)
+target_compile_features(benchmark PRIVATE cxx_std_11)
+
+foreach(BENCHMARK IN ITEMS osblock mmapbyte mmapblock)
+    add_executable(benchmark_${BENCHMARK} src/write_${BENCHMARK}.c)
+    target_link_libraries(benchmark_${BENCHMARK} PRIVATE benchmark )
+    target_compile_features(benchmark_${BENCHMARK} PRIVATE c_std_11 c_restrict)
+    target_compile_options(benchmark_${BENCHMARK} PRIVATE -Wall -o3)
+endforeach()
+#
+#foreach (BENCHMARK IN ITEMS naive orderedloop_ikj orderedloop_kij blas omp_for parallel_tiled)
+#    add_executable(benchmark_${BENCHMARK} src/dgemm_${BENCHMARK}.c)
+#    target_link_libraries(benchmark_${BENCHMARK} PRIVATE benchmark ${BLAS_LIBRARIES})
+#    target_compile_features(benchmark_${BENCHMARK} PRIVATE c_std_11 c_restrict)
+#    target_link_libraries(benchmark_${BENCHMARK} PRIVATE benchmark ${BLAS_LIBRARIES})
+#    target_compile_features(benchmark_${BENCHMARK} PRIVATE c_std_11 c_restrict)
+#    target_compile_options(benchmark_${BENCHMARK} PRIVATE -Wall -o3 -fopenmp -march=native -ffast-math)
+#endforeach ()
