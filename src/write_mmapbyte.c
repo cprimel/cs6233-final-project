@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
+const char func_type = 'w';
 const char *func_desc = "Write to file using mmap system call, one byte at a time.";
 
 void write_to_file(int fd, size_t size, size_t block_size, char* buf) {
@@ -23,5 +24,8 @@ void write_to_file(int fd, size_t size, size_t block_size, char* buf) {
     while (n < size) {
         memcpy(&data[n], buf, 1);
         n += 1;
+        buf += 1;
     }
 }
+
+size_t read_from_file(int fd, size_t size, size_t block_size, char* buf) { return -1;}

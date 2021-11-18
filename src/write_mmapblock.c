@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
+const char func_type = 'w';
 const char *func_desc = "Write to file using mmap system call, variable block size.";
 
 void write_to_file(int fd, size_t size, size_t block_size, char* buf) {
@@ -29,5 +30,8 @@ void write_to_file(int fd, size_t size, size_t block_size, char* buf) {
         }
         memcpy(&data[n], buf, nw);
         n += nw;
+        buf += nw;
     }
 }
+
+size_t read_from_file(int fd, size_t size, size_t block_size, char* buf) { return -1;}
