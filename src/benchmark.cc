@@ -40,6 +40,14 @@ size_t reference_read(int fd, size_t size, char* buf, size_t block_size = 1) {
     return n;
 }
 
+unsigned int xorbuf(unsigned int *buffer, int size) {
+    unsigned int result = 0;
+    for (int i = 0; i < size; ++i) {
+        result ^= buffer[i];
+    }
+    return result;
+}
+
 ssize_t get_block_size(int fd)
 {
     struct statfs st;
@@ -90,8 +98,8 @@ void run_write_benchmark(size_t file_size = 1024000) {
      * ~1024 plateau for mmap
      */
 
-    size_t block_size = get_block_size(fd) * 32;
-//    size_t block_size = 4096;
+//    size_t block_size = get_block_size(fd) * 32;
+    size_t block_size = 4096;
     std::cout << "Block size: " << block_size << std::endl;
 
     start = std::chrono::steady_clock::now();
@@ -125,20 +133,21 @@ void run_read_benchmark(size_t file_size = 1024000) {
 
     close(fd);
 
-    size_t n = 0;
-    int ref_xor = 0;
-    int num = 0;
-    while (n < sizeof(buf)) {
-        num = (buf[n] << 24) | (buf[n + 1] << 16) | (buf[n + 2] << 8) | buf[n + 3];
-        n += 4;
-        ref_xor ^= num;
-    }
+    unsigned int ref_xor = xorbuf(reinterpret_cast<unsigned int *>(buf), file_size / 4);
+//    size_t n = 0;
+//    int ref_xor = 0;
+//    int num = 0;
+//    while (n < sizeof(buf)) {
+//        num = (buf[n] << 24) | (buf[n + 1] << 16) | (buf[n + 2] << 8) | buf[n + 3];
+//        n += 4;
+//        ref_xor ^= num;
+//    }
 
     char test_buf[file_size];
     memset(test_buf, 0, sizeof(test_buf));
     // O_DIRECT has huge effect here
-//    fd = open("write_naive", O_RDONLY | O_DIRECT);
-    fd = open("write_naive", O_RDONLY);
+    fd = open("write_naive", O_RDONLY | O_DIRECT);
+//    fd = open("write_naive", O_RDONLY);
 
 
     size_t block_size = get_block_size(fd) * 32;
@@ -149,13 +158,8 @@ void run_read_benchmark(size_t file_size = 1024000) {
     read_from_file(fd, file_size, block_size, test_buf);
     end = std::chrono::steady_clock::now();
 
-    n = 0;
-    int test_xor = 0;
-    while (n < sizeof(test_buf)) {
-        num = (test_buf[n] << 24) | (test_buf[n + 1] << 16) | (test_buf[n + 2] << 8) | test_buf[n + 3];
-        n += 4;
-        test_xor ^= num;
-    }
+    unsigned int test_xor = xorbuf(reinterpret_cast<unsigned int *>(test_buf), file_size / 4);
+
 
     if (ref_xor != test_xor) {
         std::cout << "XORs do not match: " << ref_xor << " vs. " << test_xor << std::endl;
