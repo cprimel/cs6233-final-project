@@ -19,25 +19,15 @@ extern "C" {
     extern size_t read_from_file(int fd, size_t size, size_t block_size, char* buf);
 }
 
-void reference_write(int fd, size_t size, char* buf, size_t block_size = 1) {
-
-    size_t n = 0;
-    while (n < size) {
-        ssize_t r = write(fd, buf, block_size);
-        n += r;
-        buf+=r;
-    }
-
+void reference_write(int fd, size_t size, char* buf) {
+    FILE *file = fdopen(fd, "w");
+    fwrite(buf, 1, size, file);
 }
 
-size_t reference_read(int fd, size_t size, char* buf, size_t block_size = 1) {
-    size_t n = 0;
-    while (n < size) {
-        ssize_t r = read(fd, buf, block_size);
-        n += r;
-        buf += r;
-    }
-    return n;
+size_t reference_read(int fd, size_t size, char* buf) {
+    FILE *file = fdopen(fd, "r");
+    size_t r = fread(buf,1, size,file);
+    return r;
 }
 
 unsigned int xorbuf(unsigned int *buffer, int size) {
@@ -73,7 +63,6 @@ void run_write_benchmark(size_t file_size = 1024000) {
      */
 //    int fd = open("write_reference", O_WRONLY | O_APPEND | O_SYNC);
     int fd = open("write_reference", O_WRONLY | O_APPEND);
-
 
     double seconds;
     auto start = std::chrono::steady_clock::now();
@@ -121,9 +110,10 @@ void run_read_benchmark(size_t file_size = 1024000) {
     char buf[file_size];
     memset(buf, 0, sizeof(buf));
 
+
     double seconds;
     auto start = std::chrono::steady_clock::now();
-    reference_read(fd, file_size, buf, 1);
+    reference_read(fd, file_size, buf);
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> diff = end - start;
     seconds = diff.count();
@@ -134,20 +124,12 @@ void run_read_benchmark(size_t file_size = 1024000) {
     close(fd);
 
     unsigned int ref_xor = xorbuf(reinterpret_cast<unsigned int *>(buf), file_size / 4);
-//    size_t n = 0;
-//    int ref_xor = 0;
-//    int num = 0;
-//    while (n < sizeof(buf)) {
-//        num = (buf[n] << 24) | (buf[n + 1] << 16) | (buf[n + 2] << 8) | buf[n + 3];
-//        n += 4;
-//        ref_xor ^= num;
-//    }
 
     char test_buf[file_size];
     memset(test_buf, 0, sizeof(test_buf));
     // O_DIRECT has huge effect here
-    fd = open("write_naive", O_RDONLY | O_DIRECT);
-//    fd = open("write_naive", O_RDONLY);
+//    fd = open("write_naive", O_RDONLY | O_DIRECT);
+    fd = open("write_naive", O_RDONLY);
 
 
     size_t block_size = get_block_size(fd) * 32;
