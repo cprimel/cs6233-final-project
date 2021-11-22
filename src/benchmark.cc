@@ -180,7 +180,7 @@ void run_read_benchmark(size_t file_size = 1024000) {
 }
 
 /*
- * * ./run <filename> [-r|-w] <block_size> <block_count>
+ * * ./build.sh <filename> [-r|-w] <block_size> <block_count>
  */
 
 int main(int argc, char **argv) {
