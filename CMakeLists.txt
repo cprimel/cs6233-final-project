@@ -4,7 +4,7 @@ project(cs6233_project C CXX)
 add_library(benchmark OBJECT src/benchmark.cc)
 target_compile_features(benchmark PRIVATE cxx_std_11)
 
-foreach(BENCHMARK IN ITEMS read_osblock read_mmapbyte read_mmapblock read_stdioblock write_osblock write_mmapbyte write_mmapblock)
+foreach(BENCHMARK IN ITEMS read_osblock read_mmapbyte read_mmapblock read_stdioblock write_osblock write_mmapbyte write_mmapblock write_stdioblock)
     add_executable(benchmark_${BENCHMARK} src/${BENCHMARK}.c)
     target_link_libraries(benchmark_${BENCHMARK} PRIVATE benchmark )
     target_compile_features(benchmark_${BENCHMARK} PRIVATE c_std_11 c_restrict)

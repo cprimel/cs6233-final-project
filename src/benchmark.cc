@@ -19,6 +19,9 @@ extern "C" {
     extern size_t read_from_file(int fd, size_t size, size_t block_size, char* buf);
 }
 
+const size_t bigger_than_cachesize = 10 * 1024 * 1024;
+long *p = new long[bigger_than_cachesize];
+
 void reference_write(int fd, size_t size, char* buf) {
     FILE *file = fdopen(fd, "w");
     fwrite(buf, 1, size, file);
@@ -64,6 +67,11 @@ void run_write_benchmark(size_t file_size = 1024000) {
 //    int fd = open("write_reference", O_WRONLY | O_APPEND | O_SYNC);
     int fd = open("write_reference", O_WRONLY | O_APPEND);
 
+    for(int i = 0; i < bigger_than_cachesize; i++)
+    {
+        p[i] = rand();
+    }
+
     double seconds;
     auto start = std::chrono::steady_clock::now();
     reference_write(fd, file_size, rand_arr);
@@ -81,6 +89,11 @@ void run_write_benchmark(size_t file_size = 1024000) {
      */
 //    fd = open("write_naive", O_RDWR | O_APPEND | O_TRUNC | O_DIRECT);
     fd = open("write_naive", O_RDWR | O_APPEND | O_TRUNC);
+
+    for(int i = 0; i < bigger_than_cachesize; i++)
+    {
+        p[i] = rand();
+    }
 
     /*
      * ~4096 seems to be a plateau for write()
@@ -110,6 +123,10 @@ void run_read_benchmark(size_t file_size = 1024000) {
     char buf[file_size];
     memset(buf, 0, sizeof(buf));
 
+    for(int i = 0; i < bigger_than_cachesize; i++)
+    {
+        p[i] = rand();
+    }
 
     double seconds;
     auto start = std::chrono::steady_clock::now();
@@ -128,9 +145,13 @@ void run_read_benchmark(size_t file_size = 1024000) {
     char test_buf[file_size];
     memset(test_buf, 0, sizeof(test_buf));
     // O_DIRECT has huge effect here
-//    fd = open("write_naive", O_RDONLY | O_DIRECT);
-    fd = open("write_naive", O_RDONLY);
+    fd = open("write_naive", O_RDONLY | O_DIRECT);
+//    fd = open("write_naive", O_RDONLY);
 
+    for(int i = 0; i < bigger_than_cachesize; i++)
+    {
+        p[i] = rand();
+    }
 
     size_t block_size = get_block_size(fd) * 32;
 //    size_t block_size = 4096;
