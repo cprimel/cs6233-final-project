@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 const char func_type = 'w';
+const char *func_name = "mmapbyte";
 const char *func_desc = "Write to file using mmap system call, one byte at a time.";
 
 void write_to_file(int fd, size_t size, size_t block_size, char* buf) {

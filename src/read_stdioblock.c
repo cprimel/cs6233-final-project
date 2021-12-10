@@ -4,6 +4,7 @@
 
 
 const char func_type = 'r';
+const char *func_name = "stdioblock";
 const char *func_desc = "Read from file using standard C library, variable block size.";
 
 

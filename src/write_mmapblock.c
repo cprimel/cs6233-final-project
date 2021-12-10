@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 const char func_type = 'w';
+const char *func_name = "mmapblock";
 const char *func_desc = "Write to file using mmap system call, variable block size.";
 
 void write_to_file(int fd, size_t size, size_t block_size, char* buf) {

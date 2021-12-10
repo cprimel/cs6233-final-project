@@ -5,6 +5,7 @@
 #include <string.h>
 
 const char func_type = 'r';
+const char *func_name = "pthread_mmapblock";
 const char *func_desc = "Read from file using pthread + mmap, variable block size.";
 
 
@@ -47,7 +48,7 @@ size_t read_from_file(int fd, size_t size, size_t block_size, char* buf) {
     char* file_data = (char*) mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
 
     pthread_t *threads;
-    int num_threads = 2;
+    int num_threads = 4;
     threads = (pthread_t *) malloc(sizeof(pthread_t)*num_threads);
 
 

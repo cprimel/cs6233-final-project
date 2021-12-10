@@ -2,6 +2,7 @@
 #include <unistd.h>
 
 const char func_type = 'r';
+const char *func_name = "osblock";
 const char *func_desc = "Read from file using OS system call, variable block size.";
 
 

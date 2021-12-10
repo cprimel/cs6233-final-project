@@ -3,6 +3,7 @@
 
 
 const char func_type = 'r';
+const char *func_name = "mmapbyte";
 const char *func_desc = "Read from file using mmap OS system call, byte by byte.";
 
 

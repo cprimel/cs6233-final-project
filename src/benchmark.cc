@@ -12,10 +12,12 @@
 #include <cstring>
 #include <algorithm>
 #include <numeric>
+#include <iterator>
 
 extern "C" {
 extern const char func_type;
 extern const char *func_desc;
+extern const char *func_name;
 extern void write_to_file(int fd, size_t size, size_t block_size, char *buf);
 extern size_t read_from_file(int fd, size_t size, size_t block_size, char *buf);
 }
@@ -61,6 +63,23 @@ unsigned int xorbuf(unsigned int *buffer, int size) {
 }
 
 
+void store_data(
+        std::string func_id,
+        std::vector<size_t> test_sizes,
+        std::vector<Rates> per,
+        std::vector<std::vector<double>> benchmark_data) {
+    std::ofstream file;
+    file.open(func_id + "_" + func_type + "_" + std::to_string(std::time(nullptr)) + ".csv");
+    for (int i = 0; i < test_sizes.size(); ++i) {
+        file << test_sizes[i] << ",";
+        std::copy(benchmark_data[i].begin(), benchmark_data[i].end(), std::ostream_iterator<double>(file, ","));
+        file << per[i].min << "," << per[i].avg << "," << per[i].max;
+        file << std::endl;
+    }
+    file.close();
+
+}
+
 void run_write_benchmark(const char *filename, size_t file_size, size_t block_size) {
 
     std::vector<size_t> test_sizes;
@@ -72,7 +91,7 @@ void run_write_benchmark(const char *filename, size_t file_size, size_t block_si
     }
 
     std::vector<Rates> per;
-
+    std::vector<std::vector<double>> benchmark_data;
 
     srand(time(nullptr));
     const char alphanumeric[] = "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -110,6 +129,7 @@ void run_write_benchmark(const char *filename, size_t file_size, size_t block_si
         auto avg = std::reduce(rates.begin(), rates.end()) / rates.size();
         const auto[min, max] = std::minmax_element(rates.begin(), rates.end());
         per.emplace_back(*min, avg, *max);
+        benchmark_data.push_back(rates);
 
     }
 
@@ -118,19 +138,19 @@ void run_write_benchmark(const char *filename, size_t file_size, size_t block_si
         auto argmax = std::distance(per.begin(), result);
 
 
-        std::cout << "Best block size: " << test_sizes[argmax] / 1024 << " kB" << std::endl;
+        std::cout << "Best block size: " << test_sizes[argmax] << " kB" << std::endl;
         std::cout << "Minimum performance: " << per[argmax].min << " MiB/s" << std::endl;
         std::cout << "Average performance: " << per[argmax].avg << " MiB/s" << std::endl;
         std::cout << "Maximum performance: " << per[argmax].max << " MiB/s" << std::endl;
 
     } else {
-        std::cout << "Block size: " << test_sizes[0] / 1024 << " kB" << std::endl;
+        std::cout << "Block size: " << test_sizes[0] << " kB" << std::endl;
         std::cout << "Minimum write speed: " << per[0].min << " MiB/s" << std::endl;
         std::cout << "Average write speed: " << per[0].avg << " MiB/s" << std::endl;
         std::cout << "Maximum write speed: " << per[0].max << " MiB/s" << std::endl;
 
     }
-
+    store_data(func_name, test_sizes, per, benchmark_data);
 
 }
 
@@ -138,8 +158,9 @@ void run_read_benchmark(const char *filename, size_t file_size, size_t block_siz
 
     int fd = open(filename, O_RDONLY);
     char buf[file_size];
-    memset(buf, 0, sizeof(buf));
-    reference_read(fd, file_size, buf);
+
+    memset(buf, 0, file_size);
+    reference_read(fd, file_size, reinterpret_cast<char *>(buf));
     close(fd);
 
     unsigned int ref_xor = xorbuf(reinterpret_cast<unsigned int *>(buf), file_size / 4);
@@ -158,13 +179,16 @@ void run_read_benchmark(const char *filename, size_t file_size, size_t block_siz
     }
 
     std::vector<Rates> per;
+    std::vector<std::vector<double>> benchmark_data;
+
 
     for (size_t block: test_sizes) {
         std::vector<double> rates;
-        for (int num_iterations = 0; num_iterations < 100; ++num_iterations) {
+        size_t num_iterations = block_size == 0 ? 100 : 1000;
+        for (size_t trial = 0; trial < num_iterations; ++trial) {
 
 
-            char test_buf[file_size];
+            alignas(64) char test_buf[file_size];
             memset(test_buf, 0, sizeof(test_buf));
 
             // O_DIRECT has huge effect here
@@ -197,7 +221,7 @@ void run_read_benchmark(const char *filename, size_t file_size, size_t block_siz
         auto avg = std::reduce(rates.begin(), rates.end()) / rates.size();
         const auto[min, max] = std::minmax_element(rates.begin(), rates.end());
         per.emplace_back(*min, avg, *max);
-
+        benchmark_data.push_back(rates);
     }
 
     if (test_sizes.size() > 1) {
@@ -205,24 +229,24 @@ void run_read_benchmark(const char *filename, size_t file_size, size_t block_siz
         auto argmax = std::distance(per.begin(), result);
 
 
-        std::cout << "Best block size: " << test_sizes[argmax] / 1024 << " kB" <<  std::endl;
+        std::cout << "Best block size: " << test_sizes[argmax] << " kB" <<  std::endl;
         std::cout << "Minimum read speed: " << per[argmax].min << " MiB/s" << std::endl;
         std::cout << "Average read speed: " << per[argmax].avg << " MiB/s" << std::endl;
         std::cout << "Maximum read speed: " << per[argmax].max << " MiB/s" << std::endl;
 
     } else {
-        std::cout << "Block size: " << test_sizes[0] / 1024 << " kB" << std::endl;
+        std::cout << "Block size: " << test_sizes[0] << " kB" << std::endl;
         std::cout << "Minimum read speed: " << per[0].min << " MiB/s" << std::endl;
         std::cout << "Average read speed: " << per[0].avg << " MiB/s" << std::endl;
         std::cout << "Maximum read speed: " << per[0].max << " MiB/s" << std::endl;
 
     }
-
+    store_data(func_name,test_sizes,per, benchmark_data);
 }
 
 
 /*
- * * ./run <filename> [-r|-w] <block_size> <block_count>
+ * * ./run <filename> [-debug] [-r|-w] [-nocache] [-direct|-sync] <block_size> <block_count>
  */
 
 int main(int argc, char **argv) {
