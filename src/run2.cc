@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
 
 
-    printf("File size: %.2f GB , Time: %.2f seconds\n", n / pow(1000,3), seconds);
+    printf("File size: %.2f GB , Time: %.2f seconds\n", file_size / pow(1000,3), seconds);
 
     return 0;
 }
