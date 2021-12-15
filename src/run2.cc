@@ -6,6 +6,7 @@
 #include <ctime>
 #include <chrono>
 #include <fstream>
+#include <cmath>
 
 size_t read_from_file(int fd, size_t file_size, size_t block_size, char *buf) {
 
@@ -21,10 +22,9 @@ size_t read_from_file(int fd, size_t file_size, size_t block_size, char *buf) {
     return n;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
 
-    char *filename = argv[1];
-    const size_t block_size = strtol(argv[2], nullptr, 10);
+    const size_t block_size = strtol(argv[1], nullptr, 10);
 
     srand(time(nullptr));
     char buf[block_size];
@@ -35,38 +35,45 @@ int main(int argc, char **argv) {
         buf[i] = alphanumeric[rand() % l];
     }
 
+    const char *filename = "test_read";
     std::ofstream{filename};
-    FILE *file = fopen(filename, "a");
 
-    size_t file_size = block_size * 1024;
-    size_t n = 0;
-
-    while (n < file_size) {
-        n += fwrite(buf, 1, sizeof(buf), file);
-    }
-
-    fclose(file);
     memset(buf, 0, block_size);
 
     double seconds = 0.0;
-    double timeout = 5;
-    n = 0;
-    file = fopen(filename, "r");
+    double timeout = 0.5;
+    size_t file_size = block_size * 1024;
+    size_t n = 0;
+
     while (seconds < timeout) {
+        FILE *wfile = fopen(filename, "w+");
+        while (n < file_size) {
+            size_t w = fwrite(buf, 1, sizeof(buf), wfile);
+            n += w;
+        }
+        fclose(wfile);
+        n = 0;
+        memset(buf, 0, block_size);
+
+        FILE *rfile = fopen(filename, "r+");
         auto start = std::chrono::steady_clock::now();
-        n += fread(buf, 1,  sizeof(buf), file);
+        while (n < file_size) {
+            size_t r = fread(buf, 1, block_size, rfile);
+            if (r != block_size) {
+                break;
+            }
+            n += r;
+        }
         auto end = std::chrono::steady_clock::now();
         std::chrono::duration<double> diff = end - start;
-        seconds += diff.count();
-        if (n % file_size == 0) {
-            rewind(file);
-        }
+        seconds = diff.count();
+        fclose(rfile);
+        file_size *= 2;
     }
-   fclose(file);
 
 
 
-    printf("File size: %zu GB (%zu bytes or %d %zu-byte blocks), Time: %f seconds", n >> 30, n, n / 4096, 4096, seconds);
+    printf("File size: %.2f GB , Time: %.2f seconds\n", n / pow(1000,3), seconds);
 
     return 0;
 }
