@@ -2,4 +2,5 @@
 mkdir -p release
 cd release || exit
 cmake ..
-cmake --build
+cmake --config Release
+make

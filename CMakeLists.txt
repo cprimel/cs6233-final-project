@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(cs6233_project C CXX)
+set(CMAKE_BUILD_TYPE release)
 
 add_library(benchmark OBJECT src/benchmark.cc)
 target_compile_features(benchmark PRIVATE cxx_std_11)
