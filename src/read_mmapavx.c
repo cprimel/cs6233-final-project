@@ -7,7 +7,7 @@
 const char func_type = 'r';
 const char *func_name = "mmapavx";
 const char *func_desc = "Read from file using memory mapping and AVX instrinsics, entire file.";
-size_t min_block = 512;
+const size_t min_block = 512;
 
 unsigned int xorbuf(const unsigned int *buffer, int size);
 

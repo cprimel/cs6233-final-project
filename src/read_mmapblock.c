@@ -5,6 +5,7 @@
 const char func_type = 'r';
 const char *func_name = "mmapblock";
 const char *func_desc = "Read from file using mmap OS system call, variable block size.";
+const size_t min_block = 64;
 
 unsigned int xorbuf(const unsigned int *buffer, int size);
 

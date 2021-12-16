@@ -19,12 +19,17 @@
 
 
 bool NO_FS_CACHE = false;
+bool NO_CPU_CACHE = false;
 
+
+/*
+ * All .c code must have *all* of the following.
+ */
 extern "C" {
-extern const char func_type;
-extern const char *func_desc;
+extern const char func_type;    // (r)ead or (w)rite.
+extern const char *func_desc;   // Short sentence-long description of function
 extern const char *func_name;
-extern const size_t min_block;
+extern const size_t min_block;  // intrinsics require a certain minimum block size
 extern void write_to_file(int fd, size_t size, size_t block_size, char *buf);
 extern unsigned int read_from_file(int fd, size_t size, size_t block_size, char *buf);
 }
@@ -59,10 +64,10 @@ unsigned int reference_read(int fd, size_t size, size_t block_size, char *buf) {
     unsigned int xor_res = 0;
 
     size_t n = 0;
-    while ( n < size) {
+    while (n < size) {
         ssize_t r = read(fd, buf, block_size);
 
-        xor_res ^= xorbuf((unsigned int*)buf, r / 4);
+        xor_res ^= xorbuf((unsigned int *) buf, r / 4);
         if (r != (ssize_t) block_size) {
             break;
         }
@@ -96,14 +101,37 @@ size_t filesize(int fd) {
 }
 
 
+double round_up(double val, int decimal_places) {
+    const double multiplier = std::pow(10.0, decimal_places);
+    return std::round(val * multiplier) / multiplier;
+}
+
 void store_data(
-        const std::string& func_id,
+        const std::string &func_id,
         std::vector<size_t> test_sizes,
         std::vector<Rates> per,
-        std::vector<std::vector<double>> benchmark_data) {
+        std::vector<std::vector<double>> benchmark_data,
+        size_t file_size) {
+
+    double mebi = pow(1024,2);
+    double gibi = pow(1024,3);
+    double kibi = 1024.0;
+    std::string file_size_str;
+    if ((file_size / gibi) >= 1) {
+        file_size_str =  std::to_string(round_up(file_size / gibi, 1)) + "GiB";
+    } else if ((file_size / mebi) > 1) {
+        file_size_str =  std::to_string(round_up(file_size / mebi, 1)) + "MiB";
+    } else {
+        file_size_str =  std::to_string(round_up(file_size / kibi, 1)) + "KiB";
+
+    }
+
+    std::string fscache_flag = NO_FS_CACHE ? "nofscache" : "fscache";
+    std::string cpucache_flag = NO_FS_CACHE ? "nocpucache" : "cpucache";
+
     std::ofstream file;
-    std::string cache_flag = NO_FS_CACHE ? "nocache" : "cache";
-    file.open(func_id + "_" + func_type + "_" + cache_flag + "_" + std::to_string(std::time(nullptr)) + ".csv");
+    file.open(func_id + "_" + func_type + "_" + fscache_flag + "_" + cpucache_flag + "_" + file_size_str + "_" +
+              std::to_string(std::time(nullptr)) + ".csv");
     for (int i = 0; i < test_sizes.size(); ++i) {
         file << test_sizes[i] << ",";
         std::copy(benchmark_data[i].begin(), benchmark_data[i].end(), std::ostream_iterator<double>(file, ","));
@@ -113,42 +141,6 @@ void store_data(
     file.close();
 
 }
-
-// Source: https://github.com/GregoryConrad/pBar
-class pBar {
-public:
-    void update(double newProgress) {
-        currentProgress += newProgress;
-        amountOfFiller = (int)((currentProgress / neededProgress)*(double)pBarLength);
-    }
-    void print() {
-        currUpdateVal %= pBarUpdater.length();
-        std::cout << "\r" //Bring cursor to start of line
-             << firstPartOfpBar; //Print out first part of pBar
-        for (int a = 0; a < amountOfFiller; a++) { //Print out current progress
-            std::cout << pBarFiller;
-        }
-        std::cout << pBarUpdater[currUpdateVal];
-        for (int b = 0; b < pBarLength - amountOfFiller; b++) { //Print out spaces
-            std::cout << " ";
-        }
-        std::cout << lastPartOfpBar //Print out last part of progress bar
-             << " (" << (int)(100*(currentProgress/neededProgress)) << "%)" //This just prints out the percent
-             << std::flush;
-        currUpdateVal += 1;
-    }
-    std::string firstPartOfpBar = "[", //Change these at will (that is why I made them public)
-    lastPartOfpBar = "]",
-            pBarFiller = "|",
-            pBarUpdater = "/-\\|";
-private:
-    int amountOfFiller,
-            pBarLength = 50, //I would recommend NOT changing this
-    currUpdateVal = 0; //Do not change
-    double currentProgress = 0, //Do not change
-    neededProgress = 100; //I would recommend NOT changing this
-};
-
 
 void run_write_benchmark(const char *filename, size_t file_size, size_t block_size) {
 
@@ -217,12 +209,11 @@ void run_write_benchmark(const char *filename, size_t file_size, size_t block_si
         std::cout << "Maximum write speed: " << per[0].max << " MiB/s" << std::endl;
 
     }
-    store_data(func_name, test_sizes, per, benchmark_data);
+    store_data(func_name, test_sizes, per, benchmark_data, file_size);
 
 }
 
 void run_read_benchmark(const char *filename, size_t block_count, size_t block_size) {
-
     int fd = open(filename, O_RDONLY);
     size_t file_size = filesize(fd);
     if (block_size == 0 && block_count > 0) {
@@ -237,17 +228,18 @@ void run_read_benchmark(const char *filename, size_t block_count, size_t block_s
     close(fd);
     std::cout << "Reference XOR: " << ref_xor << std::endl;
 
+    if (NO_CPU_CACHE) {
+        for (int i = 0; i < bigger_than_cachesize; i++) {
+            p[i] = rand();
+        }
+    }
 
-//    for(int i = 0; i < bigger_than_cachesize; i++)
-//    {
-//        p[i] = rand();
-//    }
 
     std::vector<size_t> test_sizes;
     if (block_size == 0) {
         test_sizes.resize(12);
         test_sizes[0] = min_block;
-        std::generate(test_sizes.begin() + 1, test_sizes.end(), [n = min_block ]() mutable { return n <<= 1; });
+        std::generate(test_sizes.begin() + 1, test_sizes.end(), [n = min_block]() mutable { return n <<= 1; });
     } else {
         test_sizes.push_back(block_size);
     }
@@ -265,14 +257,18 @@ void run_read_benchmark(const char *filename, size_t block_count, size_t block_s
             alignas(64) char test_buf[block];
             memset(test_buf, 0, sizeof(test_buf));
 
-            // O_DIRECT has huge effect here
-            fd = open(filename, O_RDONLY | O_DIRECT);
-//            fd = open(filename, O_RDONLY);
+            if (NO_FS_CACHE) {
+                fd = open(filename, O_RDONLY | O_DIRECT);
+            } else {
+                fd = open(filename, O_RDONLY);
+            }
 
-//            for(int i = 0; i < bigger_than_cachesize; i++)
-//            {
-//                p[i] = rand();
-//            }
+            if (NO_CPU_CACHE) {
+                for (int i = 0; i < bigger_than_cachesize; i++) {
+                    p[i] = rand();
+                }
+            }
+
             if (NO_FS_CACHE) {
                 sync();
                 std::ofstream ofs("/proc/sys/vm/drop_caches");
@@ -308,7 +304,7 @@ void run_read_benchmark(const char *filename, size_t block_count, size_t block_s
         auto argmax = std::distance(per.begin(), result);
 
 
-        std::cout << "Best block size: " << test_sizes[argmax] << " kB" <<  std::endl;
+        std::cout << "Best block size: " << test_sizes[argmax] << " kB" << std::endl;
         std::cout << "Minimum read speed: " << per[argmax].min << " MiB/s" << std::endl;
         std::cout << "Average read speed: " << per[argmax].avg << " MiB/s" << std::endl;
         std::cout << "Maximum read speed: " << per[argmax].max << " MiB/s" << std::endl;
@@ -320,11 +316,11 @@ void run_read_benchmark(const char *filename, size_t block_count, size_t block_s
         std::cout << "Maximum read speed: " << per[0].max << " MiB/s" << std::endl;
 
     }
-    store_data(func_name,test_sizes,per, benchmark_data);
+    store_data(func_name, test_sizes, per, benchmark_data, file_size);
 }
 
 
-int arg_to_int(const std::string& arg) {
+int arg_to_int(const std::string &arg) {
     int parsed_arg = -1;
     try {
         std::size_t pos;
@@ -341,31 +337,39 @@ int arg_to_int(const std::string& arg) {
 }
 
 /*
- * * ./bench_{BENCH_NAME} <filename> [cache_flag-y|-n]  <block_size> <block_count>
+ * * ./bench_{BENCH_NAME} <filename> <fscache_flag: [-y|-n]> <cpucache_flag: [-y|-n]> <block_size> <block_count>
  */
 
 int main(int argc, char **argv) {
 
-
-    if (argc < 3) {
-        std::cout << argc << " arguments passed, expected >= 3 in form ./bench_{BENCH_NAME} <filename> [-cache|-nocache]  <block_size> <block_count>" <<std::endl;
+    if (argc < 5) {
+        std::cout << argc
+                  << " arguments passed, expected 5 in form ./bench_{BENCH_NAME} <filename> [-cache|-nocache]  <block_size> <block_count>"
+                  << std::endl;
     }
-    const char* filename = argv[1];
-    const char cache_flag = argv[2][1];
-    if (cache_flag == 'n') {
+    const char *filename = argv[1];
+    const char fscache_flag = argv[2][1];
+    const char cpucache_flag = argv[3][1];
+
+    if (fscache_flag == 'n') {
         NO_FS_CACHE = true;
     }
-    size_t block_size = arg_to_int(argv[3]);
-    size_t block_count = arg_to_int(argv[4]);
+    if (cpucache_flag == 'n') {
+        NO_FS_CACHE = true;
+    }
+    size_t block_size = arg_to_int(argv[4]);
+    size_t block_count = arg_to_int(argv[5]);
 
 
     std::cout << "Description:\t" << func_desc << std::endl << std::endl;
     std::cout << std::fixed << std::setprecision(2);
 
 
+    std::cout << "Block count (0 = file size): " << block_count << ", Block size (0 = find best): " << block_size
+              << std::endl;
+    std::cout << "Filesystem cache? " << fscache_flag << std::endl;
+    std::cout << "CPU cache? " << fscache_flag << std::endl;
 
-    std::cout << "Block count (0 = file size): " << block_count << ", Block size (0 = find best): " << block_size << std::endl;
-    std::cout << "Cache? " << cache_flag << std::endl;
     std::cout << "File name: " << filename << std::endl;
     switch (func_type) {
         case 'r':

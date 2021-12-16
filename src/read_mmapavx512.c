@@ -4,10 +4,11 @@
 
 const char func_type = 'r';
 const char *func_name = "mmapavx512";
-const char *func_desc = "Read from file using memory mapping and AVX512 instrinsics, entire file.";
+const char *func_desc = "Read from file using memory mapping and AVX512 instrinsics.";
+const size_t min_block = 4096;
 
 // 4096 bytes, or 4 kB
-// m5d.metal instance runs on Xeon Scalable with AVX512 extension
+// m5d.metal instance runs on Xeon Scalable with AVX512 extension!!!
 void * memcpy_intrinsics(void *dest, const void *src, size_t len)
 {
     const __m512i* s = (__m512i*)src;
@@ -96,15 +97,33 @@ void memcpy_handler(char* dest, char* src, size_t n_bytes) {
 
 }
 
-size_t read_from_file(int fd, size_t size, size_t block_size, char *buf) {
+unsigned int xorbuf(const unsigned int *buffer, int size) {
+    unsigned int result = 0;
+    for (int i = 0; i < size; ++i) {
+        unsigned int val = buffer[i];
+        result ^= val;
+    }
+    return result;
+}
+
+unsigned int read_from_file(int fd, size_t size, size_t block_size, char *buf) {
     char *file_data = (char *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-    size_t n = size;
+    unsigned int xor_res = 0;
 
-    memcpy_handler(buf, file_data, size);
-
-    munmap(file_data, n);
-
-    return n;
+    size_t n = 0;
+    while (n < size) {
+        size_t nw;
+        if (block_size < size - n) {
+            nw = block_size;
+        } else {
+            nw = size - n;
+        }
+        memcpy_handler(buf, &file_data[n], nw);
+        xor_res ^= xorbuf((unsigned int*)buf, nw / 4);
+        n += nw;
+    }
+    munmap(file_data, size);
+    return xor_res;
 }
 
 void write_to_file(int fd, size_t size, size_t block_size, char *buf) {};
