@@ -5,7 +5,7 @@ set(CMAKE_BUILD_TYPE release)
 add_library(benchmark OBJECT src/benchmark.cc)
 target_compile_features(benchmark PRIVATE cxx_std_11)
 
-foreach(BENCHMARK IN ITEMS read_mmapavx read_mmapavx2 read_mmapavx512 read_osblock read_mmapblock read_stdioblock read_pmmapblock)
+foreach(BENCHMARK IN ITEMS read_mmapavx read_mmapavx2 read_mmapavx512 read_osblock read_mmapblock read_stdioblock)
     add_executable(benchmark_${BENCHMARK} src/${BENCHMARK}.c)
     target_link_libraries(benchmark_${BENCHMARK} PRIVATE benchmark pthread)
     target_compile_features(benchmark_${BENCHMARK} PRIVATE c_std_11 c_restrict)
@@ -16,6 +16,10 @@ foreach(BENCHMARK IN ITEMS read_mmapavx read_mmapavx2 read_mmapavx512 read_osblo
     endif()
 endforeach()
 
+add_executable(fast src/fast.c)
+target_compile_options(fast PRIVATE -Wall -O3 -funroll-loops -march=native -msse4.1)
 
 add_executable(run src/run.c)
 add_executable(run2 src/run2.cc)
+add_executable(run5 src/run5.cc)
+

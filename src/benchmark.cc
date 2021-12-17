@@ -34,7 +34,7 @@ extern void write_to_file(int fd, size_t size, size_t block_size, char *buf);
 extern unsigned int read_from_file(int fd, size_t size, size_t block_size, char *buf);
 }
 
-unsigned int xorbuf(unsigned int *buffer, int size);
+unsigned int xorbuf(const unsigned int *buffer, int size);
 
 struct Rates {
     Rates(double min, double avg, double max) : min(min), avg(avg), max(max) {};
@@ -76,7 +76,7 @@ unsigned int reference_read(int fd, size_t size, size_t block_size, char *buf) {
     return xor_res;
 }
 
-unsigned int xorbuf(unsigned int *buffer, int size) {
+unsigned int xorbuf(const unsigned int *buffer, int size) {
     unsigned int result = 0;
     for (int i = 0; i < size; ++i) {
         result ^= buffer[i];
@@ -85,13 +85,13 @@ unsigned int xorbuf(unsigned int *buffer, int size) {
 }
 
 [[maybe_unused]] ssize_t get_block_size(int fd) {
-    struct statfs st;
+    struct statfs st{};
     assert(fstatfs(fd, &st) != -1);
     return (ssize_t) st.f_bsize;
 }
 
 size_t filesize(int fd) {
-    struct stat s;
+    struct stat s{};
     int r = fstat(fd, &s);
     if (r >= 0 && S_ISREG(s.st_mode) && s.st_size <= SSIZE_MAX) {
         return s.st_size;
@@ -100,11 +100,6 @@ size_t filesize(int fd) {
     }
 }
 
-
-double round_up(double val, int decimal_places) {
-    const double multiplier = std::pow(10.0, decimal_places);
-    return std::round(val * multiplier) / multiplier;
-}
 
 void store_data(
         const std::string &func_id,
@@ -118,19 +113,31 @@ void store_data(
     double kibi = 1024.0;
     std::string file_size_str;
     if ((file_size / gibi) >= 1) {
-        file_size_str =  std::to_string(round_up(file_size / gibi, 1)) + "GiB";
+        std::ostringstream tmp;
+        tmp << std::fixed;
+        tmp << std::setprecision(1);
+        tmp << file_size / gibi;
+        file_size_str =  tmp.str() + "GiB";
     } else if ((file_size / mebi) > 1) {
-        file_size_str =  std::to_string(round_up(file_size / mebi, 1)) + "MiB";
+        std::ostringstream tmp;
+        tmp << std::fixed;
+        tmp << std::setprecision(1);
+        tmp << file_size / mebi;
+        file_size_str =  tmp.str() + "MiB";
     } else {
-        file_size_str =  std::to_string(round_up(file_size / kibi, 1)) + "KiB";
+        std::ostringstream tmp;
+        tmp << std::fixed;
+        tmp << std::setprecision(1);
+        tmp << file_size / kibi;
+        file_size_str =  tmp.str() + "KiB";
 
     }
 
     std::string fscache_flag = NO_FS_CACHE ? "nofscache" : "fscache";
-    std::string cpucache_flag = NO_FS_CACHE ? "nocpucache" : "cpucache";
+    std::string cpucache_flag = NO_CPU_CACHE ? "nocpucache" : "cpucache";
 
     std::ofstream file;
-    file.open(func_id + "_" + func_type + "_" + fscache_flag + "_" + cpucache_flag + "_" + file_size_str + "_" +
+    file.open( "publish/data/"+ func_id + "_" + func_type + "_" + fscache_flag + "_" + cpucache_flag + "_" + file_size_str + "_" +
               std::to_string(std::time(nullptr)) + ".csv");
     for (int i = 0; i < test_sizes.size(); ++i) {
         file << test_sizes[i] << ",";
@@ -197,13 +204,13 @@ void run_write_benchmark(const char *filename, size_t file_size, size_t block_si
         auto argmax = std::distance(per.begin(), result);
 
 
-        std::cout << "Best block size: " << test_sizes[argmax] << " kB" << std::endl;
+        std::cout << "Best block size: " << test_sizes[argmax] << " bytes" << std::endl;
         std::cout << "Minimum performance: " << per[argmax].min << " MiB/s" << std::endl;
         std::cout << "Average performance: " << per[argmax].avg << " MiB/s" << std::endl;
         std::cout << "Maximum performance: " << per[argmax].max << " MiB/s" << std::endl;
 
     } else {
-        std::cout << "Block size: " << test_sizes[0] << " kB" << std::endl;
+        std::cout << "Block size: " << test_sizes[0] << " bytes" << std::endl;
         std::cout << "Minimum write speed: " << per[0].min << " MiB/s" << std::endl;
         std::cout << "Average write speed: " << per[0].avg << " MiB/s" << std::endl;
         std::cout << "Maximum write speed: " << per[0].max << " MiB/s" << std::endl;
@@ -250,10 +257,10 @@ void run_read_benchmark(const char *filename, size_t block_count, size_t block_s
         std::vector<double> rates;
         size_t num_iterations = 25;
 
-        std::cout << "Block size: " << block << std::endl; // For manual debugging
-
+        std::cout << "Block size: " << block << std::endl;
         for (size_t trial = 0; trial < num_iterations; ++trial) {
-            std::cout << "Trial #" << trial << "..." << std::endl; // For manual debugging
+//            std::cout << "."; // For simple visual progress check
+//            std::cout <<  trial << "..." << std::endl; // For manual debugging
             alignas(64) char test_buf[block];
             memset(test_buf, 0, sizeof(test_buf));
 
@@ -281,14 +288,15 @@ void run_read_benchmark(const char *filename, size_t block_count, size_t block_s
             unsigned int test_xor = read_from_file(fd, file_size, block, test_buf);
             auto end = std::chrono::steady_clock::now();
 
-            if (ref_xor != test_xor) {
+            if (block_size > 1 && ref_xor != test_xor) {
+                std::cout << std::endl;
                 std::cout << "XORs do not match. Error reading file." << std::endl;
                 return;
             }
 
             std::chrono::duration<double> diff = end - start;
             seconds = diff.count();
-            double test_rate = file_size / pow(10, 6) / seconds;
+            double test_rate = file_size / pow(1024, 2) / seconds;
             rates.push_back(test_rate);
             close(fd);
         }
@@ -297,6 +305,7 @@ void run_read_benchmark(const char *filename, size_t block_count, size_t block_s
         const auto[min, max] = std::minmax_element(rates.begin(), rates.end());
         per.emplace_back(*min, avg, *max);
         benchmark_data.push_back(rates);
+//        std::cout << std::endl;
     }
 
     if (test_sizes.size() > 1) {
@@ -304,13 +313,13 @@ void run_read_benchmark(const char *filename, size_t block_count, size_t block_s
         auto argmax = std::distance(per.begin(), result);
 
 
-        std::cout << "Best block size: " << test_sizes[argmax] << " kB" << std::endl;
+        std::cout << "Best block size: " << test_sizes[argmax] << " bytes" << std::endl;
         std::cout << "Minimum read speed: " << per[argmax].min << " MiB/s" << std::endl;
         std::cout << "Average read speed: " << per[argmax].avg << " MiB/s" << std::endl;
         std::cout << "Maximum read speed: " << per[argmax].max << " MiB/s" << std::endl;
 
     } else {
-        std::cout << "Block size: " << test_sizes[0] << " kB" << std::endl;
+        std::cout << "Block size: " << test_sizes[0] << " bytes" << std::endl;
         std::cout << "Minimum read speed: " << per[0].min << " MiB/s" << std::endl;
         std::cout << "Average read speed: " << per[0].avg << " MiB/s" << std::endl;
         std::cout << "Maximum read speed: " << per[0].max << " MiB/s" << std::endl;
@@ -355,8 +364,9 @@ int main(int argc, char **argv) {
         NO_FS_CACHE = true;
     }
     if (cpucache_flag == 'n') {
-        NO_FS_CACHE = true;
+        NO_CPU_CACHE = true;
     }
+
     size_t block_size = arg_to_int(argv[4]);
     size_t block_count = arg_to_int(argv[5]);
 
@@ -368,7 +378,7 @@ int main(int argc, char **argv) {
     std::cout << "Block count (0 = file size): " << block_count << ", Block size (0 = find best): " << block_size
               << std::endl;
     std::cout << "Filesystem cache? " << fscache_flag << std::endl;
-    std::cout << "CPU cache? " << fscache_flag << std::endl;
+    std::cout << "CPU cache? " << cpucache_flag << std::endl;
 
     std::cout << "File name: " << filename << std::endl;
     switch (func_type) {
