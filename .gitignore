@@ -2,3 +2,4 @@ build
 release
 .idea
 .ipynb_checkpoints
+.venv
