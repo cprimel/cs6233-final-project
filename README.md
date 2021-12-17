@@ -23,5 +23,5 @@ $ ./release/run <filename> <block_size>
 
 For Part 6:
 ```shell
-./release/fast <filename>
+$ ./release/fast <filename>
 ```
