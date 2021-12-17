@@ -18,7 +18,12 @@ $ ./release/run <filename> [-r|-w] <block_size> <block_count>
 
 For Part 2:
 ```shell
-$ ./release/run <filename> <block_size>
+$ ./release/run2 <filename> <block_size>
+```
+
+For Part 5:
+```shell
+$ ./release/run5 <filename>
 ```
 
 For Part 6:
