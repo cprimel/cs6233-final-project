@@ -1,6 +1,6 @@
 # Final Project for CS6233 Fall 2021
 
-Or, making disks go brrrr.
+Or, making disks go brrrr. A command line tool for benchmarking I/O on Linux systems and accompanying report benchmarking several methods for reading and writing to disk.
 
 ## Instructions
 
